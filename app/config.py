@@ -30,6 +30,9 @@ class Config:
     AVALIACAO_MAX_INPUT_CHARS = _as_int("AVALIACAO_MAX_INPUT_CHARS", 240_000)
     GEMINI_DATA_MODE = os.getenv("GEMINI_DATA_MODE", "unpaid").strip().lower()
     USE_FAKE_GEMINI = _as_bool("USE_FAKE_GEMINI", False)
+    # Kill switch (Protocolo RN, seção 16.5): permite desativar a geração por
+    # IA sem derrubar o restante do aplicativo (páginas estáticas continuam OK).
+    AI_GENERATION_ENABLED = _as_bool("AI_GENERATION_ENABLED", True)
 
     MAX_REQUEST_MB = _as_int("MAX_REQUEST_MB", 30)
     MAX_FILE_MB = _as_int("MAX_FILE_MB", 15)

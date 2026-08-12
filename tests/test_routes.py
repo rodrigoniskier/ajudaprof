@@ -35,7 +35,18 @@ def test_public_pages(client):
     assert "default-src 'self'" in home.headers["Content-Security-Policy"]
     assert home.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
     assert client.get("/privacidade").status_code == 200
-    assert client.get("/health").json == {"service": "ajuda-professores", "status": "ok"}
+    health = client.get("/health").json
+    assert health["service"] == "ajuda-professores"
+    assert health["status"] == "ok"
+    assert health["ai_generation_enabled"] is True
+    assert health["fake_mode"] is True
+    assert health["ai_configured"] is True
+
+
+def test_error_page_keeps_institutional_logo(client):
+    response = client.get("/rota-inexistente")
+    assert response.status_code == 404
+    assert b"logo.png" in response.data
 
 
 def test_ementa_generation(client, csrf):
@@ -142,3 +153,14 @@ def test_invalid_csrf_rejected(client):
     )
     assert response.status_code == 400
     assert response.json["error"] == "csrf_invalid"
+
+
+def test_generation_disabled_by_kill_switch(app):
+    app.config["AI_GENERATION_ENABLED"] = False
+    client = app.test_client()
+    response = client.post("/gerar/ementa", headers={"Accept": "application/json"})
+    assert response.status_code == 503
+    assert response.json["error"] == "generation_disabled"
+    assert client.get("/health").json["ai_generation_enabled"] is False
+    # Páginas estáticas continuam no ar (degradação graciosa).
+    assert client.get("/").status_code == 200

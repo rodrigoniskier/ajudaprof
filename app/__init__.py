@@ -4,6 +4,14 @@ import logging
 import os
 
 from dotenv import load_dotenv
+
+# Precisa rodar antes de "from .config import Config": os valores de Config
+# são lidos com os.getenv() no corpo da classe, ou seja, na importação. Um
+# load_dotenv() chamado só dentro de create_app() chegaria tarde demais para
+# esses atributos (o WSGI do PythonAnywhere contornava isso carregando o
+# .env antes de importar o pacote "app"; "python run.py" não fazia isso).
+load_dotenv()
+
 from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
@@ -13,8 +21,6 @@ from .security import apply_security_headers
 
 
 def create_app(config_object=None) -> Flask:
-    load_dotenv()
-
     app = Flask(__name__)
     app.config.from_object(config_object or Config)
 
@@ -29,6 +35,13 @@ def create_app(config_object=None) -> Flask:
     app.request_class = InMemoryRequest
     app.register_blueprint(bp)
     app.after_request(apply_security_headers)
+
+    @app.context_processor
+    def inject_branding():
+        # Garante que a logo institucional apareça em toda página, incluindo
+        # as renderizadas pelos error handlers abaixo (antes, error.html
+        # caía no fallback genérico "DI" por não receber esta variável).
+        return {"logo_exists": app.config["LOGO_PATH"].exists()}
 
     if app.config.get("USE_FAKE_GEMINI"):
         app.extensions["document_generator"] = FakeGeminiService()

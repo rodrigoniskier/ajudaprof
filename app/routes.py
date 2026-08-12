@@ -7,10 +7,12 @@ from typing import Any
 from flask import Blueprint, current_app, jsonify, render_template, request, send_file
 
 from .errors import AppError
+from .observability import log_event, new_request_id
 from .security import create_csrf_token, rate_limiter, validate_csrf_token
 from .services.docx_builder import build_artifact
 from .services.file_processor import collect_sources
 from .services.output_validation import validate_generated_output
+from .services.prompts import PROMPT_VERSIONS
 
 
 bp = Blueprint("main", __name__)
@@ -285,7 +287,22 @@ def privacy():
 
 @bp.get("/health")
 def health():
-    return jsonify({"status": "ok", "service": "ajuda-professores"})
+    config = current_app.config
+    api_key = config.get("GEMINI_API_KEY", "")
+    ai_configured = bool(config.get("USE_FAKE_GEMINI")) or bool(
+        api_key and api_key not in {"cole-a-chave-aqui", "sua-chave-aqui"}
+    )
+    return jsonify(
+        {
+            "status": "ok",
+            "service": "ajuda-professores",
+            # Nenhum segredo é exposto: apenas booleanos de configuração
+            # (Protocolo RN, seção 16.2 — health check por componente).
+            "ai_generation_enabled": bool(config.get("AI_GENERATION_ENABLED", True)),
+            "ai_configured": ai_configured,
+            "fake_mode": bool(config.get("USE_FAKE_GEMINI")),
+        }
+    )
 
 
 @bp.post("/gerar/<document_type>")
@@ -293,9 +310,18 @@ def generate_document(document_type: str):
     if document_type not in DOCUMENT_TYPES:
         raise AppError("Tipo de documento inválido.", 404, "not_found")
 
+    request_id = new_request_id()
     started = monotonic()
     phase = "validation"
+    metrics: dict[str, Any] = {}
     try:
+        if not current_app.config.get("AI_GENERATION_ENABLED", True):
+            raise AppError(
+                "A geração de documentos está temporariamente desativada pelo administrador. Tente novamente mais tarde.",
+                503,
+                "generation_disabled",
+            )
+
         _validate_consent_and_csrf()
         rate_limiter.check()
         form_data, upload_groups = PARSERS[document_type]()
@@ -316,7 +342,7 @@ def generate_document(document_type: str):
 
         phase = "gemini"
         generator = current_app.extensions["document_generator"]
-        generated_data = generator.generate(document_type, form_data, sources)
+        generated_data = generator.generate(document_type, form_data, sources, metrics=metrics)
         generated_data = validate_generated_output(document_type, generated_data, form_data)
 
         phase = "docx"
@@ -334,23 +360,42 @@ def generate_document(document_type: str):
         response.headers["X-Document-Review"] = "required"
         response.headers["X-Generation-Seconds"] = f"{elapsed:.1f}"
         response.headers["Cache-Control"] = "no-store, max-age=0"
-        current_app.logger.info("generation_completed type=%s elapsed=%.1fs", document_type, elapsed)
+        log_event(
+            current_app.logger,
+            event="generation_completed",
+            request_id=request_id,
+            document_type=document_type,
+            prompt_version=PROMPT_VERSIONS.get(document_type),
+            duration_ms=round(elapsed * 1000),
+            model=metrics.get("model"),
+            retry_count=metrics.get("retry_count", 0),
+            tokens_input=metrics.get("tokens_input"),
+            tokens_output=metrics.get("tokens_output"),
+        )
         return response
     except AppError as error:
-        current_app.logger.warning(
-            "generation_failed type=%s phase=%s code=%s elapsed=%.1fs",
-            document_type,
-            phase,
-            error.code,
-            monotonic() - started,
+        log_event(
+            current_app.logger,
+            event="generation_failed",
+            request_id=request_id,
+            document_type=document_type,
+            phase=phase,
+            error_code=error.code,
+            error_type=metrics.get("error_type"),
+            retry_count=metrics.get("retry_count", 0),
+            duration_ms=round((monotonic() - started) * 1000),
+            http_status=error.status_code,
         )
         raise
     except Exception as error:
-        current_app.logger.error(
-            "generation_failed type=%s phase=%s exception=%s elapsed=%.1fs",
-            document_type,
-            phase,
-            type(error).__name__,
-            monotonic() - started,
+        log_event(
+            current_app.logger,
+            event="generation_failed",
+            request_id=request_id,
+            document_type=document_type,
+            phase=phase,
+            error_type=type(error).__name__,
+            retry_count=metrics.get("retry_count", 0),
+            duration_ms=round((monotonic() - started) * 1000),
         )
         raise

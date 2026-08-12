@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import random
+import time
 from typing import Any
 
 from pydantic import ValidationError
@@ -9,6 +11,18 @@ from ..errors import ConfigurationError, GenerationError
 from .file_processor import SourceDocument
 from .prompts import SYSTEM_INSTRUCTION, build_prompt
 from .schemas import SCHEMAS
+
+# Uma única retentativa curta, e só para falhas de rede/servidor claramente
+# transitórias. Timeout não é retentado: a chamada já consumiu quase todo o
+# orçamento de tempo do worker do PythonAnywhere. 429 e 4xx também não, pois
+# não são passageiros (Protocolo RN, seção 9).
+_TRANSIENT_STATUS_CODES = {500, 502, 503}
+_TRANSIENT_EXCEPTION_NAMES = {"ServiceUnavailable", "InternalServerError", "APIConnectionError", "ConnectionError"}
+_NON_TRANSIENT_STATUS_CODES = {400, 401, 403, 404, 408, 422, 429, 504}
+_NON_TRANSIENT_EXCEPTION_NAMES = {
+    "ResourceExhausted", "TooManyRequests", "Unauthorized", "PermissionDenied",
+    "InvalidArgument", "FailedPrecondition",
+}
 
 
 class GeminiService:
@@ -101,6 +115,16 @@ class GeminiService:
         return clipped, consumed_chars + allowed
 
     @staticmethod
+    def _is_transient(exc: Exception) -> bool:
+        name = type(exc).__name__
+        status_code = getattr(exc, "code", None)
+        if name in _NON_TRANSIENT_EXCEPTION_NAMES or status_code in _NON_TRANSIENT_STATUS_CODES:
+            return False
+        if "timeout" in name.casefold() or "deadline" in name.casefold():
+            return False
+        return status_code in _TRANSIENT_STATUS_CODES or name in _TRANSIENT_EXCEPTION_NAMES
+
+    @staticmethod
     def _timeout_message(document_type: str) -> str:
         if document_type == "apostila":
             return (
@@ -120,7 +144,12 @@ class GeminiService:
         document_type: str,
         form_data: dict[str, Any],
         sources: list[SourceDocument],
+        *,
+        metrics: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """Gera o documento. Se `metrics` for passado, é preenchido com model,
+        retry_count e tokens de entrada/saída para fins de log estruturado
+        (Protocolo RN, seção 16.1) — nunca com conteúdo de formulários/anexos."""
         if document_type not in SCHEMAS:
             raise GenerationError("Tipo de documento não reconhecido.")
 
@@ -158,56 +187,86 @@ class GeminiService:
             "apostila": self.apostila_model,
             "avaliacao": self.avaliacao_model,
         }.get(document_type, self.model)
+        if metrics is not None:
+            metrics["model"] = selected_model
 
-        try:
-            response = self._get_client().models.generate_content(
-                model=selected_model,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_INSTRUCTION,
-                    temperature=temperatures.get(document_type, 0.2),
-                    max_output_tokens=max_tokens,
-                    response_mime_type="application/json",
-                    response_json_schema=schema.model_json_schema(),
-                ),
-            )
-            if not getattr(response, "text", None):
-                raise GenerationError("O Gemini não devolveu conteúdo utilizável. Tente novamente.")
-            parsed = json.loads(response.text)
-            validated = schema.model_validate(parsed)
-            return validated.model_dump()
-        except ConfigurationError:
-            raise
-        except GenerationError:
-            raise
-        except (json.JSONDecodeError, ValidationError) as exc:
-            raise GenerationError(
-                "A IA devolveu uma estrutura incompleta. Tente novamente; se persistir, reduza os anexos."
-            ) from exc
-        except Exception as exc:
-            # Não expor resposta, chave, prompt ou dados anexados.
-            name = type(exc).__name__
-            status_code = getattr(exc, "code", None)
-            timeout_error = (
-                "timeout" in name.casefold()
-                or "deadline" in name.casefold()
-                or status_code in {408, 504}
-            )
-            if name in {"ResourceExhausted", "TooManyRequests"} or status_code == 429:
-                message = "O limite temporário da API Gemini foi atingido. Aguarde e tente novamente."
-            elif timeout_error:
-                message = self._timeout_message(document_type)
-            elif name in {"Unauthorized", "PermissionDenied"} or status_code in {401, 403}:
-                message = "A API Gemini recusou a solicitação. Verifique a chave, o modelo e o faturamento."
-            else:
-                message = "Não foi possível concluir a geração na API Gemini. Tente novamente."
-            raise GenerationError(message) from exc
+        attempt = 0
+        max_attempts = 2  # geração original + no máximo 1 retentativa transitória
+        while True:
+            try:
+                response = self._get_client().models.generate_content(
+                    model=selected_model,
+                    contents=contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_INSTRUCTION,
+                        temperature=temperatures.get(document_type, 0.2),
+                        max_output_tokens=max_tokens,
+                        response_mime_type="application/json",
+                        response_json_schema=schema.model_json_schema(),
+                    ),
+                )
+                if not getattr(response, "text", None):
+                    raise GenerationError("O Gemini não devolveu conteúdo utilizável. Tente novamente.")
+                usage = getattr(response, "usage_metadata", None)
+                if metrics is not None:
+                    metrics["retry_count"] = attempt
+                    if usage is not None:
+                        metrics["tokens_input"] = getattr(usage, "prompt_token_count", None)
+                        metrics["tokens_output"] = getattr(usage, "candidates_token_count", None)
+                parsed = json.loads(response.text)
+                validated = schema.model_validate(parsed)
+                return validated.model_dump()
+            except ConfigurationError:
+                raise
+            except GenerationError:
+                raise
+            except (json.JSONDecodeError, ValidationError) as exc:
+                if metrics is not None:
+                    metrics["retry_count"] = attempt
+                    metrics["error_type"] = "AI_OUTPUT_SCHEMA_ERROR"
+                raise GenerationError(
+                    "A IA devolveu uma estrutura incompleta. Tente novamente; se persistir, reduza os anexos."
+                ) from exc
+            except Exception as exc:
+                if attempt + 1 < max_attempts and self._is_transient(exc):
+                    attempt += 1
+                    time.sleep(random.uniform(0.4, 1.2))
+                    continue
+                # Não expor resposta, chave, prompt ou dados anexados.
+                name = type(exc).__name__
+                status_code = getattr(exc, "code", None)
+                timeout_error = (
+                    "timeout" in name.casefold()
+                    or "deadline" in name.casefold()
+                    or status_code in {408, 504}
+                )
+                if name in {"ResourceExhausted", "TooManyRequests"} or status_code == 429:
+                    message = "O limite temporário da API Gemini foi atingido. Aguarde e tente novamente."
+                elif timeout_error:
+                    message = self._timeout_message(document_type)
+                elif name in {"Unauthorized", "PermissionDenied"} or status_code in {401, 403}:
+                    message = "A API Gemini recusou a solicitação. Verifique a chave, o modelo e o faturamento."
+                else:
+                    message = "Não foi possível concluir a geração na API Gemini. Tente novamente."
+                if metrics is not None:
+                    metrics["retry_count"] = attempt
+                    metrics["error_type"] = name
+                raise GenerationError(message) from exc
 
 
 class FakeGeminiService:
     """Dados determinísticos para testes locais; não chama serviços externos."""
 
-    def generate(self, document_type: str, form_data: dict[str, Any], sources: list[SourceDocument]):
+    def generate(
+        self,
+        document_type: str,
+        form_data: dict[str, Any],
+        sources: list[SourceDocument],
+        *,
+        metrics: dict[str, Any] | None = None,
+    ):
+        if metrics is not None:
+            metrics.update({"model": "fake", "retry_count": 0, "tokens_input": 0, "tokens_output": 0})
         fixtures = {
             "ementa": {
                 "ementa": (
