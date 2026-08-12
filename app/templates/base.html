@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Gerador institucional de documentos acadêmicos com revisão docente.">
+    <meta name="author" content="Prof. Rodrigo Niskier — Medicina - UNIPÊ">
+    <title>{% block title %}Ajuda-Professores{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
+    <header class="site-header">
+        <div class="container header-inner">
+            <a class="brand" href="{{ url_for('main.index') }}" aria-label="Página inicial">
+                {% if logo_exists %}
+                    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo institucional">
+                {% else %}
+                    <span class="brand-mark" aria-hidden="true">DI</span>
+                {% endif %}
+                <span>
+                    <strong>Ajuda-Professores</strong>
+                    <small>Documentos acadêmicos padronizados</small>
+                </span>
+            </a>
+            <nav aria-label="Navegação principal">
+                <a href="{{ url_for('main.index') }}">Geradores</a>
+                <a href="{{ url_for('main.privacy') }}">Privacidade e LGPD</a>
+            </nav>
+        </div>
+    </header>
+
+    <main id="conteudo">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <div class="container footer-inner">
+            <div>
+                <strong>Ajuda-Professores</strong>
+                <p>Sem cadastro, sem banco de dados e com revisão docente obrigatória.</p>
+                <p class="creator-credit">Desenvolvido por: Prof. Rodrigo Niskier [Medicina - UNIPÊ]</p>
+            </div>
+            <div class="footer-links">
+                <a href="{{ url_for('main.privacy') }}">Privacidade e LGPD</a>
+                <span>Uso profissional por docentes e gestores maiores de 18 anos.</span>
+                <span>Conteúdo gerado por IA pode conter erros.</span>
+            </div>
+        </div>
+    </footer>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+    <div class="loading-overlay" id="loading-overlay" hidden aria-live="assertive" aria-busy="true">
+        <div class="loading-card">
+            <div class="spinner" aria-hidden="true"></div>
+            <h2>Gerando o documento</h2>
+            <p id="loading-message">O Gemini está analisando os anexos e compondo o arquivo. Não feche esta página.</p>
+            <small id="loading-elapsed"></small>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</body>
+</html>

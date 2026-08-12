@@ -1,0 +1,5 @@
+Ajuda-Professores — pacote 2026.07.21-r4
+
+Inclui as correções de tempo de geração para apostilas e avaliações.
+Quantidade esperada de testes automatizados: 22.
+

@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Erro — Ajuda-Professores{% endblock %}
+{% block content %}
+<section class="error-page container">
+    <div class="error-card">
+        <span class="error-code">!</span>
+        <h1>Não foi possível concluir</h1>
+        <p>{{ message }}</p>
+        <a class="button button-primary" href="{{ url_for('main.index') }}">Voltar aos geradores</a>
+    </div>
+</section>
+{% endblock %}

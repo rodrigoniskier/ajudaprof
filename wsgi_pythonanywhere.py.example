@@ -1,0 +1,24 @@
+"""Modelo do arquivo WSGI do PythonAnywhere.
+
+Troque SEU_USUARIO pelo nome da sua conta e copie este conteúdo para o
+arquivo WSGI indicado na aba Web do PythonAnywhere.
+"""
+
+import os
+import sys
+
+from dotenv import load_dotenv
+
+
+PROJECT_HOME = "/home/SEU_USUARIO/documenta_ia"
+
+if PROJECT_HOME not in sys.path:
+    sys.path.insert(0, PROJECT_HOME)
+
+load_dotenv(os.path.join(PROJECT_HOME, ".env"))
+
+from app import create_app  # noqa: E402
+
+
+application = create_app()
+

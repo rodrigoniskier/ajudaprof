@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+{% block title %}Ajuda-Professores — Geradores acadêmicos{% endblock %}
+
+{% macro upload_field(id, name, label, help_text, required=false, multiple=false) %}
+<div class="field field-upload">
+    <label for="{{ id }}">{{ label }}{% if required %}<span class="required" aria-label="obrigatório">*</span>{% endif %}</label>
+    <input id="{{ id }}" name="{{ name }}" type="file"
+           accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.png,.jpg,.jpeg"
+           {% if required %}required{% endif %} {% if multiple %}multiple{% endif %}>
+    <small>{{ help_text }} Máximo de {{ max_file_mb }} MB por arquivo.</small>
+</div>
+{% endmacro %}
+
+{% macro consent(prefix) %}
+<div class="consent-box">
+    <label class="check-line" for="{{ prefix }}-consent">
+        <input id="{{ prefix }}-consent" name="privacy_consent" type="checkbox" value="yes" required>
+        <span>Estou ciente de que os anexos serão processados temporariamente e enviados à API Gemini, não serão gravados em banco de dados por este aplicativo e o documento gerado exige revisão docente. Li a <a href="{{ url_for('main.privacy') }}" target="_blank" rel="noopener">Política de Privacidade e LGPD</a>.</span>
+    </label>
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+</div>
+{% endmacro %}
+
+{% macro submit_button(label) %}
+<button class="button button-primary submit-button" type="submit">
+    <span>{{ label }}</span>
+    <span aria-hidden="true">→</span>
+</button>
+{% endmacro %}
+
+{% block content %}
+<section class="hero">
+    <div class="container hero-grid">
+        <div>
+            <span class="eyebrow">PLANEJAMENTO ACADÊMICO ASSISTIDO POR IA</span>
+            <h1>Do documento de referência ao DOCX institucional.</h1>
+            <p>Escolha uma aba, envie apenas os materiais necessários e baixe o arquivo pronto para revisão, sem cadastro e sem histórico de conteúdo.</p>
+            <div class="hero-badges" aria-label="Características do serviço">
+                <span>6 geradores independentes</span>
+                <span>Sem banco de dados</span>
+                <span>Saída editável em Word</span>
+            </div>
+        </div>
+        <aside class="privacy-summary">
+            <strong>Privacidade por padrão</strong>
+            <p>O aplicativo não cria perfil, não pede login e não armazena documentos ou respostas geradas. Os dados permanecem apenas durante a solicitação.</p>
+            {% if data_mode != 'paid' %}
+            <div class="warning-compact">
+                <strong>API em modo gratuito</strong>
+                <span>Não envie dados pessoais, sigilosos ou confidenciais: os termos do Google permitem uso das entradas e saídas para melhoria de produtos e revisão humana.</span>
+            </div>
+            {% else %}
+            <div class="success-compact">
+                <strong>Projeto Gemini com faturamento ativo</strong>
+                <span>O Google informa que não usa prompts e respostas de serviços pagos para melhorar seus produtos, embora possa manter registros limitados para segurança.</span>
+            </div>
+            {% endif %}
+        </aside>
+    </div>
+</section>
+
+<section class="workspace container">
+    <div class="tabs" role="tablist" aria-label="Tipos de documento">
+        <button id="tab-ementa" class="tab is-active" type="button" role="tab" aria-selected="true" aria-controls="panel-ementa" data-tab="ementa"><span>01</span>Ementa</button>
+        <button id="tab-plano-ensino" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-plano-ensino" data-tab="plano-ensino"><span>02</span>Plano de ensino</button>
+        <button id="tab-cronograma" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-cronograma" data-tab="cronograma"><span>03</span>Cronograma</button>
+        <button id="tab-planos-aula" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-planos-aula" data-tab="planos-aula"><span>04</span>Planos de aula</button>
+        <button id="tab-apostila" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-apostila" data-tab="apostila"><span>05</span>Apostila</button>
+        <button id="tab-avaliacao" class="tab" type="button" role="tab" aria-selected="false" aria-controls="panel-avaliacao" data-tab="avaliacao"><span>06</span>Avaliação</button>
+    </div>
+
+    <section id="panel-ementa" class="tab-panel is-active" role="tabpanel" aria-labelledby="tab-ementa" data-panel="ementa">
+        <div class="panel-heading">
+            <div><span class="step-number">01</span><h2>Ementa do componente curricular</h2></div>
+            <p>Anexe obrigatoriamente o PPC do curso e as Diretrizes Curriculares Nacionais. A IA localizará o papel do componente, competências e escopo formativo.</p>
+        </div>
+        <form class="generator-form" action="{{ url_for('main.generate_document', document_type='ementa') }}" method="post" enctype="multipart/form-data">
+            <fieldset>
+                <legend>Identificação</legend>
+                <div class="form-grid cols-2">
+                    <div class="field"><label for="ementa-curso">Curso<span class="required">*</span></label><input id="ementa-curso" name="ementa_curso" required placeholder="Ex.: Medicina"></div>
+                    <div class="field"><label for="ementa-componente">Componente curricular<span class="required">*</span></label><input id="ementa-componente" name="ementa_componente" required placeholder="Ex.: Imunologia Clínica"></div>
+                    <div class="field"><label for="ementa-ch">Carga horária<span class="required">*</span></label><input id="ementa-ch" name="ementa_carga_horaria" required placeholder="Ex.: 60 h/a"></div>
+                    <div class="field"><label for="ementa-periodo">Período recomendado</label><input id="ementa-periodo" name="ementa_periodo" placeholder="Ex.: 4º período"></div>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Documentos orientadores</legend>
+                <div class="form-grid cols-2">
+                    {{ upload_field('ementa-ppc', 'ementa_ppc', 'PPC do curso', 'PDF ou DOCX com o projeto pedagógico.', true) }}
+                    {{ upload_field('ementa-dcns', 'ementa_dcns', 'Diretrizes Curriculares Nacionais', 'Você pode selecionar mais de um documento.', true, true) }}
+                </div>
+                <div class="field"><label for="ementa-observacoes">Orientações adicionais</label><textarea id="ementa-observacoes" name="ementa_observacoes" rows="3" placeholder="Ênfases, recortes, competências institucionais ou restrições."></textarea></div>
+            </fieldset>
+            {{ consent('ementa') }}
+            {{ submit_button('Gerar ementa em DOCX') }}
+        </form>
+    </section>
+
+    <section id="panel-plano-ensino" class="tab-panel" role="tabpanel" aria-labelledby="tab-plano-ensino" data-panel="plano-ensino" hidden>
+        <div class="panel-heading">
+            <div><span class="step-number">02</span><h2>Plano de ensino do componente</h2></div>
+            <p>Informe os tópicos das aulas. A ementa, o PPC e as DCNs são opcionais, mas melhoram significativamente o alinhamento do documento.</p>
+        </div>
+        <form class="generator-form" action="{{ url_for('main.generate_document', document_type='plano-ensino') }}" method="post" enctype="multipart/form-data">
+            <fieldset>
+                <legend>Identificação acadêmica</legend>
+                <div class="form-grid cols-3">
+                    <div class="field span-2"><label for="pe-curso">Curso<span class="required">*</span></label><input id="pe-curso" name="pe_curso" required></div>
+                    <div class="field"><label for="pe-periodo">Período<span class="required">*</span></label><input id="pe-periodo" name="pe_periodo" required></div>
+                    <div class="field span-2"><label for="pe-componente">Componente curricular<span class="required">*</span></label><input id="pe-componente" name="pe_componente" required></div>
+                    <div class="field"><label for="pe-semestre">Semestre letivo<span class="required">*</span></label><input id="pe-semestre" name="pe_semestre" required placeholder="Ex.: 2026.2"></div>
+                    <div class="field"><label for="pe-turno">Turno<span class="required">*</span></label><select id="pe-turno" name="pe_turno" required><option value="">Selecione</option><option>Matutino</option><option>Vespertino</option><option>Noturno</option><option>Integral</option></select></div>
+                    <div class="field"><label for="pe-modalidade">Modalidade<span class="required">*</span></label><select id="pe-modalidade" name="pe_modalidade" required><option>Presencial</option><option>Híbrida</option><option>A distância</option></select></div>
+                    <div class="field"><label for="pe-ch-semanal">C/H semanal<span class="required">*</span></label><input id="pe-ch-semanal" name="pe_ch_semanal" required placeholder="Ex.: 3 h/a"></div>
+                    <div class="field"><label for="pe-ch-semestral">C/H semestral<span class="required">*</span></label><input id="pe-ch-semestral" name="pe_ch_semestral" required placeholder="Ex.: 60 h/a"></div>
+                    <div class="field span-2"><label for="pe-professor">Professor responsável<span class="required">*</span></label><input id="pe-professor" name="pe_professor" required></div>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Tópicos das aulas</legend>
+                <div class="repeater" data-repeater data-min-rows="1">
+                    <div class="repeater-row" data-row><span class="row-index">1</span><input name="pe_topicos[]" required placeholder="Tópico da aula"><button type="button" class="icon-button" data-remove-row aria-label="Remover tópico">×</button></div>
+                    <div class="repeater-row" data-row><span class="row-index">2</span><input name="pe_topicos[]" required placeholder="Tópico da aula"><button type="button" class="icon-button" data-remove-row aria-label="Remover tópico">×</button></div>
+                    <div class="repeater-row" data-row><span class="row-index">3</span><input name="pe_topicos[]" required placeholder="Tópico da aula"><button type="button" class="icon-button" data-remove-row aria-label="Remover tópico">×</button></div>
+                    <template><div class="repeater-row" data-row><span class="row-index"></span><input name="pe_topicos[]" required placeholder="Tópico da aula"><button type="button" class="icon-button" data-remove-row aria-label="Remover tópico">×</button></div></template>
+                    <button type="button" class="button button-secondary" data-add-row>+ Inserir outro tópico</button>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Anexos opcionais para melhor direcionamento</legend>
+                <div class="form-grid cols-3">
+                    {{ upload_field('pe-ementa', 'pe_ementa', 'Ementa vigente', 'PDF, DOCX ou texto.') }}
+                    {{ upload_field('pe-ppc', 'pe_ppc', 'PPC do curso', 'PDF ou DOCX.') }}
+                    {{ upload_field('pe-dcns', 'pe_dcns', 'DCNs', 'Um ou mais arquivos.', false, true) }}
+                </div>
+                <div class="field"><label for="pe-orientacoes">Orientações adicionais</label><textarea id="pe-orientacoes" name="pe_orientacoes" rows="3"></textarea></div>
+            </fieldset>
+            {{ consent('pe') }}
+            {{ submit_button('Gerar plano de ensino em DOCX') }}
+        </form>
+    </section>
+
+    <section id="panel-cronograma" class="tab-panel" role="tabpanel" aria-labelledby="tab-cronograma" data-panel="cronograma" hidden>
+        <div class="panel-heading">
+            <div><span class="step-number">03</span><h2>Cronograma de aulas</h2></div>
+            <p>O calendário oficial da IES é opcional e permite considerar feriados, recessos e eventos. Sem ele, confira todas as datas manualmente.</p>
+        </div>
+        <form class="generator-form" action="{{ url_for('main.generate_document', document_type='cronograma') }}" method="post" enctype="multipart/form-data">
+            <fieldset>
+                <legend>Componente, turma e carga horária</legend>
+                <div class="form-grid cols-3">
+                    <div class="field"><label for="cr-curso">Curso<span class="required">*</span></label><input id="cr-curso" name="cr_curso" required></div>
+                    <div class="field span-2"><label for="cr-componente">Componente curricular<span class="required">*</span></label><input id="cr-componente" name="cr_componente" required></div>
+                    <div class="field"><label for="cr-coordenador">Coordenador do componente<span class="required">*</span></label><input id="cr-coordenador" name="cr_coordenador" required></div>
+                    <div class="field"><label for="cr-periodo">Período<span class="required">*</span></label><input id="cr-periodo" name="cr_periodo" required></div>
+                    <div class="field"><label for="cr-semestre">Semestre letivo<span class="required">*</span></label><input id="cr-semestre" name="cr_semestre" required placeholder="Ex.: 2026.2"></div>
+                    <div class="field"><label for="cr-turma">Turma<span class="required">*</span></label><input id="cr-turma" name="cr_turma" required></div>
+                    <div class="field"><label for="cr-ch-teorica">C/H teórica<span class="required">*</span></label><input id="cr-ch-teorica" name="cr_ch_teorica" required placeholder="Ex.: 30 h/a"></div>
+                    <div class="field"><label for="cr-ch-pratica">C/H prática<span class="required">*</span></label><input id="cr-ch-pratica" name="cr_ch_pratica" required placeholder="Ex.: 30 h/a ou 0"></div>
+                    <div class="field span-3"><label for="cr-docentes">Nome dos docentes<span class="required">*</span></label><textarea id="cr-docentes" name="cr_docentes" rows="3" required placeholder="Um docente por linha"></textarea></div>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Período de oferta e encontros semanais</legend>
+                <div class="form-grid cols-2 compact-grid">
+                    <div class="field"><label for="cr-data-inicio">Data da primeira aula<span class="required">*</span></label><input id="cr-data-inicio" name="cr_data_inicio" type="date" required></div>
+                    <div class="field"><label for="cr-data-fim">Data final prevista<span class="required">*</span></label><input id="cr-data-fim" name="cr_data_fim" type="date" required></div>
+                </div>
+                <div class="repeater schedule-repeater" data-repeater data-min-rows="1">
+                    <div class="repeater-row schedule-row" data-row>
+                        <span class="row-index">1</span>
+                        <label>Dia<select name="cr_dia[]" required><option value="">Selecione</option><option>Segunda-feira</option><option>Terça-feira</option><option>Quarta-feira</option><option>Quinta-feira</option><option>Sexta-feira</option><option>Sábado</option><option>Domingo</option></select></label>
+                        <label>Início<input name="cr_inicio[]" type="time" required></label>
+                        <label>Término<input name="cr_fim[]" type="time" required></label>
+                        <label>Docente preferencial<input name="cr_docente_dia[]" placeholder="Opcional"></label>
+                        <button type="button" class="icon-button" data-remove-row aria-label="Remover encontro">×</button>
+                    </div>
+                    <template><div class="repeater-row schedule-row" data-row><span class="row-index"></span><label>Dia<select name="cr_dia[]" required><option value="">Selecione</option><option>Segunda-feira</option><option>Terça-feira</option><option>Quarta-feira</option><option>Quinta-feira</option><option>Sexta-feira</option><option>Sábado</option><option>Domingo</option></select></label><label>Início<input name="cr_inicio[]" type="time" required></label><label>Término<input name="cr_fim[]" type="time" required></label><label>Docente preferencial<input name="cr_docente_dia[]" placeholder="Opcional"></label><button type="button" class="icon-button" data-remove-row aria-label="Remover encontro">×</button></div></template>
+                    <button type="button" class="button button-secondary" data-add-row>+ Inserir outro dia e horário</button>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Tópicos, calendário e orientações</legend>
+                <div class="repeater" data-repeater data-min-rows="1">
+                    <div class="repeater-row" data-row><span class="row-index">1</span><input name="cr_topicos[]" required placeholder="Tópico da aula"><button type="button" class="icon-button" data-remove-row aria-label="Remover tópico">×</button></div>
+                    <div class="repeater-row" data-row><span class="row-index">2</span><input name="cr_topicos[]" required placeholder="Tópico da aula"><button type="button" class="icon-button" data-remove-row aria-label="Remover tópico">×</button></div>
+                    <div class="repeater-row" data-row><span class="row-index">3</span><input name="cr_topicos[]" required placeholder="Tópico da aula"><button type="button" class="icon-button" data-remove-row aria-label="Remover tópico">×</button></div>
+                    <template><div class="repeater-row" data-row><span class="row-index"></span><input name="cr_topicos[]" required placeholder="Tópico da aula"><button type="button" class="icon-button" data-remove-row aria-label="Remover tópico">×</button></div></template>
+                    <button type="button" class="button button-secondary" data-add-row>+ Inserir outro tópico</button>
+                </div>
+                <div class="form-grid cols-2 top-gap">
+                    {{ upload_field('cr-calendario', 'cr_calendario', 'Calendário oficial da IES', 'Recomendado para ajustar feriados, recessos e eventos.', false, true) }}
+                    <div class="field"><label for="cr-orientacoes">Orientações adicionais</label><textarea id="cr-orientacoes" name="cr_orientacoes" rows="5" placeholder="Ex.: reservar as duas últimas semanas para avaliações."></textarea></div>
+                </div>
+            </fieldset>
+            {{ consent('cr') }}
+            {{ submit_button('Gerar cronograma em DOCX') }}
+        </form>
+    </section>
+
+    <section id="panel-planos-aula" class="tab-panel" role="tabpanel" aria-labelledby="tab-planos-aula" data-panel="planos-aula" hidden>
+        <div class="panel-heading">
+            <div><span class="step-number">04</span><h2>Planos de aulas individuais</h2></div>
+            <p>Anexe o cronograma, as DCNs e a ementa. Sem um recorte específico, serão gerados planos para todas as aulas de conteúdo; múltiplos arquivos serão entregues em ZIP.</p>
+        </div>
+        <form class="generator-form" action="{{ url_for('main.generate_document', document_type='planos-aula') }}" method="post" enctype="multipart/form-data">
+            <fieldset>
+                <legend>Identificação</legend>
+                <div class="form-grid cols-3">
+                    <div class="field"><label for="pa-curso">Curso<span class="required">*</span></label><input id="pa-curso" name="pa_curso" required></div>
+                    <div class="field span-2"><label for="pa-componente">Componente curricular<span class="required">*</span></label><input id="pa-componente" name="pa_componente" required></div>
+                    <div class="field"><label for="pa-modalidade">Modalidade<span class="required">*</span></label><select id="pa-modalidade" name="pa_modalidade" required><option>Presencial</option><option>Híbrida</option><option>A distância</option></select></div>
+                    <div class="field"><label for="pa-semestre">Semestre letivo<span class="required">*</span></label><input id="pa-semestre" name="pa_semestre" required></div>
+                    <div class="field"><label for="pa-periodo">Período<span class="required">*</span></label><input id="pa-periodo" name="pa_periodo" required></div>
+                    <div class="field"><label for="pa-turmas">Turma(s)<span class="required">*</span></label><input id="pa-turmas" name="pa_turmas" required></div>
+                    <div class="field span-2"><label for="pa-coordenador">Coordenador<span class="required">*</span></label><input id="pa-coordenador" name="pa_coordenador" required></div>
+                    <div class="field span-3"><label for="pa-aula-alvo">Aula ou intervalo desejado</label><input id="pa-aula-alvo" name="pa_aula_alvo" placeholder="Ex.: somente aula 6; aulas 4 a 8; deixe vazio para todas"></div>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Anexos obrigatórios</legend>
+                <div class="form-grid cols-3">
+                    {{ upload_field('pa-cronograma', 'pa_cronograma', 'Cronograma de aulas', 'PDF, DOCX ou XLSX.', true) }}
+                    {{ upload_field('pa-dcns', 'pa_dcns', 'Diretrizes Curriculares Nacionais', 'Um ou mais documentos.', true, true) }}
+                    {{ upload_field('pa-ementa', 'pa_ementa', 'Ementa do componente', 'PDF, DOCX ou texto.', true) }}
+                </div>
+                <div class="field"><label for="pa-orientacoes">Orientações adicionais</label><textarea id="pa-orientacoes" name="pa_orientacoes" rows="3"></textarea></div>
+            </fieldset>
+            {{ consent('pa') }}
+            {{ submit_button('Gerar plano(s) de aula') }}
+        </form>
+    </section>
+
+    <section id="panel-apostila" class="tab-panel" role="tabpanel" aria-labelledby="tab-apostila" data-panel="apostila" hidden>
+        <div class="panel-heading">
+            <div><span class="step-number">05</span><h2>Apostila de uma aula</h2></div>
+            <p>Será gerada uma apostila por vez. O plano individual da aula é obrigatório. Para uma geração mais rápida, prefira DOCX ou PDF com texto selecionável e envie somente referências diretamente relacionadas à aula.</p>
+        </div>
+        <form class="generator-form" action="{{ url_for('main.generate_document', document_type='apostila') }}" method="post" enctype="multipart/form-data">
+            <fieldset>
+                <legend>Escopo da apostila</legend>
+                <div class="form-grid cols-3">
+                    <div class="field"><label for="ap-curso">Curso<span class="required">*</span></label><input id="ap-curso" name="ap_curso" required></div>
+                    <div class="field span-2"><label for="ap-componente">Componente curricular<span class="required">*</span></label><input id="ap-componente" name="ap_componente" required></div>
+                    <div class="field span-2"><label for="ap-titulo">Título da aula</label><input id="ap-titulo" name="ap_titulo" placeholder="Pode ser extraído do plano anexado"></div>
+                    <div class="field"><label for="ap-publico">Público-alvo<span class="required">*</span></label><input id="ap-publico" name="ap_publico" required placeholder="Ex.: estudantes do 4º período"></div>
+                    <div class="field"><label for="ap-nivel">Nível de profundidade<span class="required">*</span></label><select id="ap-nivel" name="ap_nivel" required><option>Introdutório</option><option selected>Intermediário</option><option>Avançado</option></select></div>
+                    <div class="field"><label for="ap-extensao">Extensão desejada<span class="required">*</span></label><select id="ap-extensao" name="ap_extensao" required><option>Breve — 4 a 6 páginas</option><option selected>Regular — 7 a 12 páginas</option><option>Ampliada — 13 a 20 páginas</option></select></div>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Fontes</legend>
+                <div class="form-grid cols-2">
+                    {{ upload_field('ap-plano', 'ap_plano', 'Plano individual da aula', 'Documento obrigatório. Prefira DOCX ou PDF com texto selecionável.', true) }}
+                    {{ upload_field('ap-referencias', 'ap_referencias', 'Materiais de referência', 'Opcional. Envie apenas trechos autorizados e diretamente relacionados à aula; muitos arquivos aumentam o tempo.', false, true) }}
+                </div>
+                <div class="field"><label for="ap-orientacoes">Orientações adicionais</label><textarea id="ap-orientacoes" name="ap_orientacoes" rows="4" placeholder="Ex.: incluir casos clínicos, quadros-síntese e perguntas de revisão."></textarea></div>
+            </fieldset>
+            {{ consent('ap') }}
+            {{ submit_button('Gerar apostila em DOCX') }}
+        </form>
+    </section>
+
+    <section id="panel-avaliacao" class="tab-panel" role="tabpanel" aria-labelledby="tab-avaliacao" data-panel="avaliacao" hidden>
+        <div class="panel-heading">
+            <div><span class="step-number">06</span><h2>Avaliação parametrizada</h2></div>
+            <p>Será gerada uma avaliação por vez, com até 30 questões, gabarito e rubricas em página separada. Envie somente as apostilas e os planos diretamente relacionados aos conteúdos avaliados; prefira DOCX ou PDF com texto selecionável.</p>
+        </div>
+        <form class="generator-form" id="evaluation-form" action="{{ url_for('main.generate_document', document_type='avaliacao') }}" method="post" enctype="multipart/form-data">
+            <fieldset>
+                <legend>Identificação da avaliação</legend>
+                <div class="form-grid cols-3">
+                    <div class="field"><label for="av-curso">Curso<span class="required">*</span></label><input id="av-curso" name="av_curso" required></div>
+                    <div class="field span-2"><label for="av-componente">Componente curricular<span class="required">*</span></label><input id="av-componente" name="av_componente" required></div>
+                    <div class="field span-2"><label for="av-titulo">Título da avaliação<span class="required">*</span></label><input id="av-titulo" name="av_titulo" required placeholder="Ex.: Avaliação 1 — Unidade I"></div>
+                    <div class="field"><label for="av-professor">Professor(a)<span class="required">*</span></label><input id="av-professor" name="av_professor" required></div>
+                    <div class="field"><label for="av-turma">Turma<span class="required">*</span></label><input id="av-turma" name="av_turma" required></div>
+                    <div class="field"><label for="av-data">Data</label><input id="av-data" name="av_data" type="date"></div>
+                    <div class="field"><label for="av-duracao">Duração<span class="required">*</span></label><input id="av-duracao" name="av_duracao" required placeholder="Ex.: 90 minutos"></div>
+                    <div class="field"><label for="av-valor-total">Valor total<span class="required">*</span></label><input id="av-valor-total" name="av_valor_total" required placeholder="Ex.: 10,0 pontos"></div>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Quantidade e tipos de questão</legend>
+                <div class="form-grid cols-3 compact-grid"><div class="field"><label for="av-numero">Número total de questões<span class="required">*</span></label><input id="av-numero" name="av_numero_questoes" type="number" min="1" max="30" value="10" required><small>Máximo de 30 questões por geração para respeitar o tempo do servidor.</small></div></div>
+                <div class="repeater evaluation-repeater" data-repeater data-min-rows="1">
+                    <div class="repeater-row evaluation-row" data-row>
+                        <span class="row-index">1</span>
+                        <label>Tipo<select name="av_tipo[]" required><option>Múltipla escolha — resposta única</option><option>Múltipla escolha — respostas múltiplas</option><option>Asserção–razão</option><option>Discursiva</option><option>Outra</option></select></label>
+                        <label>Quantidade<input name="av_quantidade[]" type="number" min="1" max="30" value="10" required></label>
+                        <label>Valor por questão<input name="av_valor[]" placeholder="Ex.: 1,0 ponto"></label>
+                        <label>Alternativas<input name="av_alternativas[]" type="number" min="2" max="8" value="5"></label>
+                        <label>Se “Outra”, descreva<input name="av_outro[]" placeholder="Opcional"></label>
+                        <button type="button" class="icon-button" data-remove-row aria-label="Remover grupo">×</button>
+                    </div>
+                    <template><div class="repeater-row evaluation-row" data-row><span class="row-index"></span><label>Tipo<select name="av_tipo[]" required><option>Múltipla escolha — resposta única</option><option>Múltipla escolha — respostas múltiplas</option><option>Asserção–razão</option><option>Discursiva</option><option>Outra</option></select></label><label>Quantidade<input name="av_quantidade[]" type="number" min="1" max="30" value="1" required></label><label>Valor por questão<input name="av_valor[]" placeholder="Ex.: 1,0 ponto"></label><label>Alternativas<input name="av_alternativas[]" type="number" min="2" max="8" value="5"></label><label>Se “Outra”, descreva<input name="av_outro[]" placeholder="Opcional"></label><button type="button" class="icon-button" data-remove-row aria-label="Remover grupo">×</button></div></template>
+                    <button type="button" class="button button-secondary" data-add-row>+ Inserir outro tipo</button>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Parametrização pedagógica</legend>
+                <div class="form-grid cols-3">
+                    <div class="field span-3"><span class="label-like">Taxonomia de Bloom<span class="required">*</span></span><div class="check-grid"><label><input type="checkbox" name="av_bloom[]" value="Lembrar">Lembrar</label><label><input type="checkbox" name="av_bloom[]" value="Compreender" checked>Compreender</label><label><input type="checkbox" name="av_bloom[]" value="Aplicar" checked>Aplicar</label><label><input type="checkbox" name="av_bloom[]" value="Analisar" checked>Analisar</label><label><input type="checkbox" name="av_bloom[]" value="Avaliar">Avaliar</label><label><input type="checkbox" name="av_bloom[]" value="Criar">Criar</label></div></div>
+                    <div class="field"><label for="av-facil">Fácil (%)<span class="required">*</span></label><input id="av-facil" name="av_facil" type="number" min="0" max="100" value="20" required></div>
+                    <div class="field"><label for="av-media">Média (%)<span class="required">*</span></label><input id="av-media" name="av_media" type="number" min="0" max="100" value="60" required></div>
+                    <div class="field"><label for="av-dificil">Difícil (%)<span class="required">*</span></label><input id="av-dificil" name="av_dificil" type="number" min="0" max="100" value="20" required></div>
+                    <div class="field"><label for="av-contextualizacao">Contextualização<span class="required">*</span></label><select id="av-contextualizacao" name="av_contextualizacao" required><option>Predominantemente contextualizada</option><option>Equilíbrio entre direta e contextualizada</option><option>Predominantemente direta</option></select></div>
+                    <div class="field span-2"><label for="av-parametros">Parâmetros adicionais</label><textarea id="av-parametros" name="av_parametros" rows="3" placeholder="Ex.: integrar casos clínicos; evitar negativas; incluir competência específica."></textarea></div>
+                    <div class="field span-3"><label class="check-line"><input type="checkbox" name="av_somente_anexos" value="yes" checked><span>Usar exclusivamente o conteúdo sustentado pelos anexos.</span></label></div>
+                </div>
+            </fieldset>
+            <fieldset>
+                <legend>Fontes avaliadas</legend>
+                <div class="form-grid cols-2">
+                    {{ upload_field('av-apostilas', 'av_apostilas', 'Apostilas correspondentes', 'Selecione todas as apostilas dos conteúdos da avaliação.', true, true) }}
+                    {{ upload_field('av-planos', 'av_planos', 'Planos individuais correspondentes', 'Selecione todos os planos de aula pertinentes.', true, true) }}
+                </div>
+            </fieldset>
+            {{ consent('av') }}
+            {{ submit_button('Gerar avaliação em DOCX') }}
+        </form>
+    </section>
+</section>
+{% endblock %}

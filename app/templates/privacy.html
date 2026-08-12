@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Privacidade e LGPD — Ajuda-Professores{% endblock %}
+{% block content %}
+<section class="legal-page container">
+    <div class="legal-hero">
+        <span class="eyebrow">TRANSPARÊNCIA E PROTEÇÃO DE DADOS</span>
+        <h1>Privacidade, processamento temporário e LGPD</h1>
+        <p>Versão preparada para um aplicativo acadêmico sem cadastro e sem banco de dados. Antes da publicação institucional, preencha os dados do controlador e submeta o texto ao encarregado de dados ou à assessoria jurídica da IES.</p>
+    </div>
+
+    <div class="legal-layout">
+        <aside class="legal-nav" aria-label="Nesta página">
+            <strong>Nesta página</strong>
+            <a href="#resumo">Resumo</a>
+            <a href="#fluxo">Fluxo dos dados</a>
+            <a href="#gemini">API Gemini</a>
+            <a href="#hospedagem">Hospedagem e registros técnicos</a>
+            <a href="#lgpd">LGPD e direitos</a>
+            <a href="#seguranca">Medidas de segurança</a>
+        </aside>
+
+        <article class="legal-content">
+            <section id="resumo">
+                <h2>1. Resumo</h2>
+                <p>O serviço destina-se exclusivamente ao uso profissional por docentes, gestores e administradores maiores de 18 anos. A conta, o faturamento e a chave da API Gemini devem ser administrados por um responsável institucional adulto e autorizado.</p>
+                <p>O Ajuda-Professores não exige conta, login ou perfil de usuário. O aplicativo não grava em banco de dados os campos preenchidos, os anexos enviados, as respostas da IA ou os arquivos DOCX/ZIP gerados. O conteúdo é mantido somente na memória necessária para atender à requisição e é liberado ao término do processamento ou em caso de erro.</p>
+                <p>O aplicativo foi concebido para documentos curriculares e materiais acadêmicos sem dados pessoais. Não envie dados de estudantes, prontuários, informações de saúde, documentos sigilosos, segredos comerciais, questões protegidas ainda não aplicadas ou qualquer conteúdo cuja remessa a um provedor externo não tenha sido autorizada.</p>
+            </section>
+
+            <section id="fluxo">
+                <h2>2. Fluxo dos dados</h2>
+                <ol>
+                    <li>O navegador envia os campos e anexos ao servidor por HTTPS.</li>
+                    <li>O servidor valida formato e tamanho e mantém o conteúdo apenas durante a solicitação.</li>
+                    <li>Os textos extraídos e, quando necessário, PDFs ou imagens são enviados à API Gemini para geração estruturada.</li>
+                    <li>O servidor converte a resposta em DOCX ou ZIP e transmite o download ao navegador.</li>
+                    <li>O aplicativo não cria cópia de histórico, não oferece recuperação posterior e não indexa o conteúdo.</li>
+                </ol>
+            </section>
+
+            <section id="gemini">
+                <h2>3. Processamento pela API Gemini</h2>
+                <p>A geração depende de serviço externo do Google. Portanto, embora este aplicativo não mantenha os documentos, o conteúdo enviado é processado pela infraestrutura do Google e pode envolver transferência internacional de dados.</p>
+                {% if data_mode != 'paid' %}
+                <div class="legal-alert warning">
+                    <strong>Configuração declarada: serviço não pago.</strong>
+                    <p>Nos termos atuais do Gemini API, o Google informa que pode usar entradas e saídas dos serviços não pagos para fornecer, melhorar e desenvolver produtos e tecnologias; revisores humanos também podem processar esse conteúdo. Por isso, não envie informações pessoais, sensíveis, confidenciais ou sigilosas.</p>
+                </div>
+                {% else %}
+                <div class="legal-alert success">
+                    <strong>Configuração declarada: serviço pago.</strong>
+                    <p>Nos termos atuais do Gemini API, prompts, arquivos e respostas de serviços pagos não são usados para melhorar os produtos do Google. Ainda assim, o Google pode manter registros por período limitado para segurança, prevenção de abuso e obrigações legais.</p>
+                </div>
+                {% endif %}
+                <p>Consulte os <a href="https://ai.google.dev/gemini-api/terms" target="_blank" rel="noopener">Termos Adicionais da API Gemini</a> e a <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Política de Privacidade do Google</a>. A instituição deve preferir um projeto com faturamento ativo e instrumento contratual adequado ao tratamento institucional.</p>
+            </section>
+
+            <section id="hospedagem">
+                <h2>4. Hospedagem e registros técnicos</h2>
+                <p>O aplicativo é destinado à publicação no PythonAnywhere. O provedor de hospedagem pode tratar registros técnicos mínimos — como endereço IP, data, horário, rota acessada, agente do navegador e eventos de segurança — para operar e proteger o serviço. Esses registros pertencem à infraestrutura do provedor e não incluem intencionalmente o conteúdo dos campos ou anexos.</p>
+                <p>Não há ferramenta de publicidade, perfil comportamental, pixel de rastreamento ou analytics adicionada pelo projeto.</p>
+            </section>
+
+            <section id="lgpd">
+                <h2>5. LGPD, controlador e direitos</h2>
+                <p><strong>Controlador a preencher:</strong> {{ institution_name }}. <strong>Canal de privacidade:</strong> <a href="mailto:{{ privacy_email }}">{{ privacy_email }}</a>.</p>
+                <p>A aplicação foi desenhada segundo os princípios de finalidade, adequação, necessidade, segurança, prevenção e transparência. Como o uso institucional concreto pode variar, a IES deverá registrar a finalidade, definir a base legal aplicável, avaliar fornecedores e transferência internacional, documentar prazos de retenção dos registros técnicos e estabelecer procedimento de resposta a incidentes.</p>
+                <p>Quando houver tratamento de dado pessoal nos registros técnicos, o titular poderá solicitar confirmação, acesso, correção, informação sobre compartilhamento e demais direitos previstos na LGPD por meio do canal acima, observadas as hipóteses legais.</p>
+            </section>
+
+            <section id="seguranca">
+                <h2>6. Medidas incorporadas</h2>
+                <ul>
+                    <li>API key exclusivamente no backend, carregada por variável de ambiente.</li>
+                    <li>Sem banco de dados, cadastro, histórico de conteúdo ou armazenamento de downloads.</li>
+                    <li>Lista restrita de formatos, limite de tamanho e proteção contra arquivos Office excessivamente expandidos.</li>
+                    <li>Token antifalsificação sem cookie, limitação transitória de requisições e cabeçalhos de segurança.</li>
+                    <li>Sem registro deliberado de campos, anexos, prompts ou respostas em logs da aplicação.</li>
+                    <li>Instruções contra prompt injection presente nos documentos enviados.</li>
+                    <li>Saída marcada como conteúdo que requer revisão humana e aprovação institucional.</li>
+                </ul>
+            </section>
+        </article>
+    </div>
+</section>
+{% endblock %}
