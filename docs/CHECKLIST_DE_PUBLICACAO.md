@@ -19,6 +19,7 @@
 - [ ] Modelos de apostila/avaliação, timeout e limites de entrada foram conferidos.
 - [ ] `GEMINI_DATA_MODE` corresponde ao faturamento real do projeto.
 - [ ] `USE_FAKE_GEMINI=false` em produção.
+- [ ] `AI_GENERATION_ENABLED=true` (kill switch manual; deixe `false` só durante um incidente).
 - [ ] Nome, unidade, site, endereço, rodapé e e-mail de privacidade foram preenchidos.
 - [ ] `app/static/img/logo.png` contém a logo aprovada.
 

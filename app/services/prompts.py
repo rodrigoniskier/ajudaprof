@@ -33,6 +33,18 @@ REGRAS OBRIGATÓRIAS:
 """.strip()
 
 
+# Versão do texto operacional de cada gerador (Protocolo RN, seção 15 —
+# "prompts são código"). Incrementar ao alterar qualquer instrução abaixo.
+PROMPT_VERSIONS = {
+    "ementa": "2026.08-1",
+    "plano-ensino": "2026.08-1",
+    "cronograma": "2026.08-1",
+    "planos-aula": "2026.08-1",
+    "apostila": "2026.08-1",
+    "avaliacao": "2026.08-1",
+}
+
+
 DOCUMENT_INSTRUCTIONS = {
     "ementa": """
 Crie uma única ementa institucional sintética, redigida preferencialmente por

@@ -6,6 +6,7 @@
     <meta name="description" content="Gerador institucional de documentos acadêmicos com revisão docente.">
     <meta name="author" content="Prof. Rodrigo Niskier — Medicina - UNIPÊ">
     <title>{% block title %}Ajuda-Professores{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
@@ -16,7 +17,7 @@
                 {% if logo_exists %}
                     <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo institucional">
                 {% else %}
-                    <span class="brand-mark" aria-hidden="true">DI</span>
+                    <span class="brand-mark" aria-hidden="true">AP</span>
                 {% endif %}
                 <span>
                     <strong>Ajuda-Professores</strong>

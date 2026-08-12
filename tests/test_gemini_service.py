@@ -1,3 +1,5 @@
+import json
+
 from app.services.file_processor import SourceDocument
 from app.services.gemini_service import GeminiService
 from app.services.prompts import build_prompt
@@ -54,3 +56,80 @@ def test_evaluation_prompt_requests_concise_exact_output():
     prompt = build_prompt("avaliacao", {"numero_questoes": 10}, [])
     assert "exatamente 10 questões" in prompt
     assert "justificativas de gabarito concisas" in prompt
+
+
+class _FakeUsage:
+    def __init__(self, prompt_tokens, output_tokens):
+        self.prompt_token_count = prompt_tokens
+        self.candidates_token_count = output_tokens
+
+
+class _FakeResponse:
+    def __init__(self, payload, usage=None):
+        self.text = json.dumps(payload)
+        self.usage_metadata = usage
+
+
+_VALID_EMENTA = {
+    "ementa": "Texto.",
+    "bibliografia_basica": [],
+    "bibliografia_complementar": [],
+    "notas_para_revisao": [],
+}
+
+
+def test_generate_retries_once_on_transient_error(monkeypatch):
+    calls = {"n": 0}
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            calls["n"] += 1
+            if calls["n"] == 1:
+                error = Exception("temporary upstream failure")
+                error.code = 503
+                raise error
+            return _FakeResponse(_VALID_EMENTA, usage=_FakeUsage(120, 340))
+
+    class FakeClient:
+        models = FakeModels()
+
+    service = GeminiService("test-key", "model")
+    monkeypatch.setattr(service, "_get_client", lambda: FakeClient())
+    monkeypatch.setattr("app.services.gemini_service.time.sleep", lambda _seconds: None)
+
+    metrics = {}
+    result = service.generate("ementa", {}, [], metrics=metrics)
+
+    assert calls["n"] == 2
+    assert result["ementa"] == "Texto."
+    assert metrics["retry_count"] == 1
+    assert metrics["tokens_input"] == 120
+    assert metrics["tokens_output"] == 340
+
+
+def test_generate_does_not_retry_non_transient_error(monkeypatch):
+    from app.errors import GenerationError
+
+    calls = {"n": 0}
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            calls["n"] += 1
+            error = Exception("invalid credentials")
+            error.code = 403
+            raise error
+
+    class FakeClient:
+        models = FakeModels()
+
+    service = GeminiService("test-key", "model")
+    monkeypatch.setattr(service, "_get_client", lambda: FakeClient())
+
+    metrics = {}
+    try:
+        service.generate("ementa", {}, [], metrics=metrics)
+        raise AssertionError("deveria ter levantado GenerationError")
+    except GenerationError as exc:
+        assert "recusou a solicitação" in str(exc)
+    assert calls["n"] == 1
+    assert metrics["retry_count"] == 0
